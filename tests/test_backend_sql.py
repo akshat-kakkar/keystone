@@ -25,6 +25,7 @@ from keystone import policy
 from keystone import test
 from keystone import token
 from keystone import trust
+from keystone import quota
 
 import default_fixtures
 import test_backend
@@ -47,6 +48,7 @@ class SqlTests(test.TestCase, sql.Base):
         self.token_man = token.Manager()
         self.trust_man = trust.Manager()
         self.policy_man = policy.Manager()
+        self.quota_man = quota.Manager()
 
         # create tables and keep an engine reference for cleanup.
         # this must be done after the models are loaded by the managers.
@@ -59,6 +61,7 @@ class SqlTests(test.TestCase, sql.Base):
         self.token_api = self.token_man.driver
         self.policy_api = self.policy_man.driver
         self.trust_api = self.trust_man.driver
+        self.quota_api = self.quota_man.driver
 
         # populate the engine with tables & fixtures
         self.load_fixtures(default_fixtures)
@@ -316,4 +319,8 @@ class SqlCatalog(SqlTests, test_backend.CatalogTests):
 
 
 class SqlPolicy(SqlTests, test_backend.PolicyTests):
+    pass
+
+
+class SqlQuoas(SqlTests, test_backend.QuotaTests):
     pass

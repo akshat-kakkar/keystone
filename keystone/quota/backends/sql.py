@@ -126,17 +126,28 @@ class Resources(sql.Base):
                           resource_type, purge_quota_after, created_by):
         """ Registers a resource in the quota manager
         """
+        if(type(resource_name) is not str):
+            raise TypeError(('resource_name should be a string'))
+        if (not re.match(r'^[a-z0-9]+\.[a-z0-9]+$', resource_name, re.I)):
+            raise ValueError('resource_name is not correctly formatted')
         if((type(parameters) is not list)):
             raise TypeError(('parameters should be a list'))
+        if((type(child_identity) is not list)):
+            raise TypeError(('child_identity should be a list'))
+        if((type(resource_type) is not str)):
+            raise TypeError(('resource_type should be a list'))
+        if((type(purge_quota_after) is not int)):
+            raise TypeError(('purge_quota_after should be an integer'))
         if (type(created_by) is not dict):
             raise TypeError(('created_by should be a dictionary'))
+
         session = self.get_session()
         with session.begin():
             # Check no resource should exist with name resource_name
-            ref = session.query(ResourcesModel.name)\
+            query = session.query(ResourcesModel.name)\
                          .filter(ResourcesModel.name == resource_name)\
                          .filter(ResourcesModel.closed_at == None)
-            result = ref.all()
+            result = query.all()
             if (len(result) == 0):
                 # i.e. resource is not registered
                 # so, register it!
@@ -162,7 +173,8 @@ class Resources(sql.Base):
         return
 
     def update_resource(self, resource_name, parameters, child_identity,
-                            resource_type, purge_quota_after):
+                            resource_type, purge_quota_after, updated_by,
+                            remark):
         """ Updates resource related fields in the quota manager.
         :param resource_name: Resource to be updated. It should be a string in
                               the format <service-name>.<resouce-name>
@@ -176,15 +188,99 @@ class Resources(sql.Base):
         :purge_quota_after: A numeric value to be set as purge_quota_after
                             None means not to be updated
         """
-        return
+        if(type(resource_name) is not str):
+            raise TypeError(('resource_name should be a string'))
+        if (not re.match(r'^[a-z0-9]+\.[a-z0-9]+$', resource_name, re.I)):
+            raise ValueError('resource_name is not correctly formatted')
+        if((parameters is not None) and (type(parameters) is not list)):
+            raise TypeError(('parameters should be a list'))
+        if((child_identity is not None) and(type(child_identity) is not list)):
+            raise TypeError(('child_identity should be a list'))
+        if((resource_type is not None) and (type(resource_type) is not str)):
+            raise TypeError(('resource_type should be a list'))
+        if((purge_quota_after is not None) and
+           (type(purge_quota_after) is not int)):
+            raise TypeError(('purge_quota_after should be an integer'))
+        if (type(updated_by) is not dict):
+            raise TypeError(('updated_by should be a dictionary'))
 
-    def get_resource_details(self, resource_name):
         session = self.get_session()
         with session.begin():
-            ref = session.query(ResourcesModel)\
+            query = session.query(ResourcesModel)\
                          .filter(ResourcesModel.name == resource_name)\
                          .filter(ResourcesModel.closed_at == None)
-            result = ref.one()
+            pre_update_record = query.one()
+            update_dict = {}
+            historyRemark = ""
+            if ((parameters is not None) and
+                (set(parameters) !=
+                 set(cPickle.loads(str(pre_update_record.parameters))))
+                ):
+                update_dict['parameters'] = cPickle.dumps(parameters)
+                historyRemark += "parameters: "\
+                            + str(cPickle.loads(str(pre_update_record\
+                                                    .parameters)))\
+                            + "->"\
+                            + str(parameters)\
+                            + ". "
+            if ((child_identity is not None) and
+                (set(child_identity) !=
+                 set(cPickle.loads(str(pre_update_record.child_identity))))
+                ):
+                update_dict['child_identity'] = cPickle.dumps(child_identity)
+                historyRemark += "child_identity: "\
+                            + str(cPickle.loads(str(pre_update_record\
+                                                .child_identity)))\
+                            + "->"\
+                            + str(child_identity)\
+                            + ". "
+            if ((resource_type is not None) and
+                 (resource_type != str(pre_update_record.resource_type))):
+                update_dict['resource_type'] = resource_type
+                historyRemark += "resource_type: "\
+                                    + str(pre_update_record.resource_type)\
+                                    + "->"\
+                                    + str(resource_type)\
+                                    + ". "
+            if ((purge_quota_after is not None) and
+                (purge_quota_after != pre_update_record.purge_quota_after)):
+                update_dict['purge_quota_after'] = purge_quota_after
+                historyRemark += "purge_quota_after: "\
+                                    + str(pre_update_record.purge_quota_after)\
+                                    + "->"\
+                                    + str(purge_quota_after)\
+                                    + ". "
+            if(len(update_dict) == 0):
+                raise Exception("Nothing To Update")
+
+            if (remark == None):
+                remark = ""
+
+            historyRemark += remark
+            # Update the record
+            session.query(ResourcesModel)\
+                   .filter(ResourcesModel.id == pre_update_record.id)\
+                   .update(update_dict)
+            # Create a history record for the same
+            ref = HistoryResourcesModel(id=str(uuid.uuid4().hex),
+                              resource_id=pre_update_record.id,
+                              updated_at=datetime.datetime.now(),
+                              remark=historyRemark,
+                              updated_by=cPickle.dumps(updated_by))
+            session.add(ref)
+        return pre_update_record
+
+    def get_resource_details(self, resource_name):
+        if(type(resource_name) is not str):
+            raise TypeError(('resource_name should be a string'))
+        if (not re.match(r'^[a-z0-9]+\.[a-z0-9]+$', resource_name, re.I)):
+            raise ValueError('resource_name is not correctly formatted')
+        session = self.get_session()
+        with session.begin():
+            query = session.query(ResourcesModel)\
+                         .filter(ResourcesModel.name == resource_name)\
+                         .filter(ResourcesModel.closed_at == None)
+            result = query.one()
             resource_details = {}
             resource_details["name"] = resource_name
             resource_details["parameters"] = cPickle\
@@ -199,39 +295,55 @@ class Resources(sql.Base):
             return resource_details
 
     def get_parameters(self, resource_name):
+        if(type(resource_name) is not str):
+            raise TypeError(('resource_name should be a string'))
+        if (not re.match(r'^[a-z0-9]+\.[a-z0-9]+$', resource_name, re.I)):
+            raise ValueError('resource_name is not correctly formatted')
         session = self.get_session()
         with session.begin():
-            ref = session.query(ResourcesModel.parameters)\
+            query = session.query(ResourcesModel.parameters)\
                          .filter(ResourcesModel.name == resource_name)\
                          .filter(ResourcesModel.closed_at == None)
-            result = ref.one()
+            result = query.one()
             return cPickle.loads(str(result.parameters))
 
     def get_child_identity(self, resource_name):
+        if(type(resource_name) is not str):
+            raise TypeError(('resource_name should be a string'))
+        if (not re.match(r'^[a-z0-9]+\.[a-z0-9]+$', resource_name, re.I)):
+            raise ValueError('resource_name is not correctly formatted')
         session = self.get_session()
         with session.begin():
-            ref = session.query(ResourcesModel.child_identity)\
+            query = session.query(ResourcesModel.child_identity)\
                          .filter(ResourcesModel.name == resource_name)\
                          .filter(ResourcesModel.closed_at == None)
-            result = ref.one()
+            result = query.one()
             return cPickle.loads(str(result.child_identity))
 
     def get_resource_type(self, resource_name):
+        if(type(resource_name) is not str):
+            raise TypeError(('resource_name should be a string'))
+        if (not re.match(r'^[a-z0-9]+\.[a-z0-9]+$', resource_name, re.I)):
+            raise ValueError('resource_name is not correctly formatted')
         session = self.get_session()
         with session.begin():
-            ref = session.query(ResourcesModel.type)\
+            query = session.query(ResourcesModel.type)\
                          .filter(ResourcesModel.name == resource_name)\
                          .filter(ResourcesModel.closed_at == None)
-            result = ref.one()
+            result = query.one()
             return str(result.type)
 
     def get_purge_quota_after(self, resource_name):
+        if(type(resource_name) is not str):
+            raise TypeError(('resource_name should be a string'))
+        if (not re.match(r'^[a-z0-9]+\.[a-z0-9]+$', resource_name, re.I)):
+            raise ValueError('resource_name is not correctly formatted')
         session = self.get_session()
         with session.begin():
-            ref = session.query(ResourcesModel.purge_quota_after)\
+            query = session.query(ResourcesModel.purge_quota_after)\
                          .filter(ResourcesModel.name == resource_name)\
                          .filter(ResourcesModel.closed_at == None)
-            result = ref.one()
+            result = query.one()
             return result.purge_quota_after
 
     def get_resource_list(self, service_name):
@@ -240,7 +352,22 @@ class Resources(sql.Base):
         :param service_name: name of the service for which resources
                              are to be returned
         """
-        return
+        if(type(service_name) is not str):
+            raise TypeError(('service_name should be a string'))
+        if (not re.match(r'^[a-z0-9]+$', service_name, re.I)):
+            raise ValueError('service_name is not correctly formatted')
+        session = self.get_session()
+        with session.begin():
+            query = session.query(ResourcesModel.name)\
+                         .filter(ResourcesModel.name.like
+                                    (service_name + ".%"))\
+                         .filter(ResourcesModel.closed_at == None)
+            result = query.all()
+            resource_list = []
+            for res in result:
+                resource_name = str(res.name)
+                resource_list.append(resource_name.split('.')[1])
+        return resource_list
 
 
 class Quotas(sql.Base):
@@ -249,7 +376,7 @@ class Quotas(sql.Base):
                                 get_only_query=False):
         if(type(child_data) is not dict):
             raise TypeError('child_data should be a dictionary')
-        if((type(service) is not str) & (type(service) is not list)):
+        if((type(service) is not str) and (type(service) is not list)):
             raise TypeError('service should be either string or list')
         session = self.get_session()
         with session.begin():
@@ -270,6 +397,25 @@ class Quotas(sql.Base):
             else:
                 resource_match.append(ResourcesModel.name ==
                                       (service + "." + resource))
+            result = session.query(ResourcesModel.name)\
+                                         .filter(or_(*resource_match)).all()
+            service_registered = False
+            services_not_registered = []
+            if (type(service) is list):
+                for one_service in service:
+                    service_registered = False
+                    for res in result:
+                        if (str(res.name).startswith(one_service + ".")):
+                            service_registered = True
+                            break
+                    if (service_registered == False):
+                        services_not_registered.append(one_service)
+                if (len(services_not_registered) != 0):
+                    raise Exception("Services(s) Not Registered : " +
+                                    ','.join(services_not_registered))
+            else:
+                if (len(result) == 0):
+                    raise Exception("Resource Not Registered")
             subquery = session.query(ChildFieldDataModel.quota_id).filter(and_
                         (ChildFieldDataModel.quota_id == QuotasModel.id,
                         QuotasModel.resource_id == ResourcesModel.id))\
@@ -308,9 +454,10 @@ class Quotas(sql.Base):
         '''
         if(type(partial_child_data) is not dict):
             raise TypeError('partial_child_data should be a dictionary')
-        if((type(service) is not str) & (type(service) is not list)):
+        if((type(service) is not str) and (type(service) is not list)):
             raise TypeError('service should be either string or list')
-        if((list_keys_only is not None) & (type(list_keys_only) is not list)):
+        if((list_keys_only is not None) and
+           (type(list_keys_only) is not list)):
             raise TypeError('list_keys_only should be a list')
         child_data_copy = dict(partial_child_data)
         if (list_keys_only is not None):
@@ -396,7 +543,7 @@ class Quotas(sql.Base):
         return [quota_id_list, child_data_list]
 
     def set_quota(self, resource_name, ceiling, child_data, parent_data,
-                   created_by, remark=None, update_if_exist=True):
+                   created_by, remark=None):
         if(type(child_data) is not dict):
             raise TypeError(('child_data should be a dictionary'))
         if(type(parent_data) is not dict):
@@ -407,6 +554,8 @@ class Quotas(sql.Base):
             raise TypeError(('resource_name should be a string'))
         if (not re.match(r'^[a-z0-9]+\.[a-z0-9]+$', resource_name, re.I)):
             raise ValueError('resource_name is not correctly formatted')
+
+        update_if_exist = True
         service_resource_split = resource_name.split('.')
         service = service_resource_split[0]
         resource = service_resource_split[1]
@@ -511,11 +660,11 @@ class Quotas(sql.Base):
                                                        service_list,
                                                        None,
                                                        True)
-            ref = session.query(ResourcesModel.name, QuotasModel.ceiling)\
+            query = session.query(ResourcesModel.name, QuotasModel.ceiling)\
                     .filter(QuotasModel.resource_id == ResourcesModel.id)\
                     .filter(QuotasModel.id.in_(quota_ids))\
                     .order_by(ResourcesModel.name)
-            result = ref.all()
+            result = query.all()
             service_list.sort()
             service_dict = {}
             for service in service_list:
@@ -568,8 +717,7 @@ class Quotas(sql.Base):
         return quota_values_to_be_deleted
 
     def set_domain_quota(self, resource_name, ceiling, domain_id, region_name,
-                         parent_data, created_by, remark=None,
-                         update_if_exist=True):
+                         parent_data, created_by, remark=None):
         if(type(parent_data) is not dict):
             raise TypeError(('parent_data should be a dictionary'))
         if(type(created_by) is not dict):
@@ -595,7 +743,7 @@ class Quotas(sql.Base):
         child_data["region"] = region_name
 
         return self.set_quota(resource_name, ceiling, child_data, parent_data,
-                              created_by, remark, update_if_exist)
+                              created_by, remark)
 
     def delete_domain_quota(self, service_list, domain_id, region_name,
                             parent_data, deleted_by):
@@ -715,12 +863,12 @@ class Quotas(sql.Base):
         child_data_list = quota_ids_child_data_list[1]
         session = self.get_session()
         with session.begin():
-            ref = session.query(ResourcesModel.name, QuotasModel.ceiling,
+            query = session.query(ResourcesModel.name, QuotasModel.ceiling,
                                 QuotasModel.id)\
                     .filter(QuotasModel.resource_id == ResourcesModel.id)\
                     .filter(QuotasModel.id.in_(quota_ids))\
                     .order_by(ResourcesModel.name)
-            result = ref.all()
+            result = query.all()
 
             service_list.sort()
 
@@ -736,7 +884,6 @@ class Quotas(sql.Base):
                 service_dict = {}
                 for service in service_list:
                     resources_n_quotas = {}
-                    print service, one_child
                     for (quota_id, child_data) in zip(quota_ids,
                                                       child_data_list):
                         if (one_child == child_data):
@@ -747,11 +894,79 @@ class Quotas(sql.Base):
                                     if (str(service_name) == service):
                                         resources_n_quotas[str(resource_name)]\
                                         = res.ceiling
-                                        print service, resources_n_quotas
-                    print service, resources_n_quotas
                     service_dict[service] = resources_n_quotas
                 one_obj_to_return = []
                 one_obj_to_return.append(one_child)
                 one_obj_to_return.append(service_dict)
                 list_to_return.append(one_obj_to_return)
             return list_to_return
+
+    def register_resource(self, resource_name, parameters, child_identity,
+                          resource_type, purge_quota_after, created_by):
+        """ Registers a resource in the quota manager
+        """
+        resource = Resources()
+        return resource.register_resource(resource_name, parameters,
+                                          child_identity, resource_type,
+                                          purge_quota_after, created_by)
+
+    def deregister_resource(self, resource_name, parameters, child_identity,
+                            resource_type, purge_quota_after, deregistered_by):
+        """ De-registers (deletes) a resource in the quota manager.
+            All the corresponding quotas are also deleted
+        """
+        resource = Resources()
+        return resource.deregister_resource(resource_name, parameters,
+                                          child_identity, resource_type,
+                                          purge_quota_after, deregistered_by)
+
+    def update_resource(self, resource_name, parameters, child_identity,
+                            resource_type, purge_quota_after, updated_by,
+                            remark):
+        """ Updates resource related fields in the quota manager.
+        :param resource_name: Resource to be updated. It should be a string in
+                              the format <service-name>.<resouce-name>
+                              Eg. 'nova.instance'
+        :parameters: A list to be set as parameters for the given resource
+                     None means not to be updated
+        :child_identity: A list to be set as child_identity
+                         None means not to be updated
+        :resource_type: A string to be set as type of the resource
+                        None means not to be updated
+        :purge_quota_after: A numeric value to be set as purge_quota_after
+                            None means not to be updated
+        """
+        resource = Resources()
+        return resource.update_resource(resource_name, parameters,
+                                        child_identity, resource_type,
+                                        purge_quota_after, updated_by,
+                                        remark)
+
+    def get_resource_details(self, resource_name):
+        resource = Resources()
+        return resource.get_resource_details(resource_name)
+
+    def get_parameters(self, resource_name):
+        resource = Resources()
+        return resource.get_parameters(resource_name)
+
+    def get_child_identity(self, resource_name):
+        resource = Resources()
+        return resource.get_child_identity(resource_name)
+
+    def get_resource_type(self, resource_name):
+        resource = Resources()
+        return resource.get_resource_type(resource_name)
+
+    def get_purge_quota_after(self, resource_name):
+        resource = Resources()
+        return resource.get_purge_quota_after(resource_name)
+
+    def get_resource_list(self, service_name):
+        """Returns list of resources registered with quota manager
+           for the given service
+        :param service_name: name of the service for which resources
+                             are to be returned
+        """
+        resource = Resources()
+        return resource.get_resource_list(service_name)

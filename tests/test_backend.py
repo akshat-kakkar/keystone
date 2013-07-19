@@ -2578,3 +2578,234 @@ class PolicyTests(object):
                           self.policy_man.delete_policy,
                           EMPTY_CONTEXT,
                           uuid.uuid4().hex)
+
+
+class QuotaTests(object):
+    def create_sample_quotas(self):
+        sample_user_id = uuid.uuid4().hex
+        sample_role_id = uuid.uuid4().hex
+        sample_domain_id = uuid.uuid4.hex
+        sample_parent_data = {"role-id": sample_role_id}
+        sample_region = "GENEVA"
+        sample_data = {}
+        sample_data["user-id"] = sample_user_id
+        sample_data["role-id"] = sample_role_id
+        sample_data["domain-id"] = sample_domain_id
+        sample_data["parent-data"] = sample_parent_data
+        sample_data["region"] = sample_region
+
+        # Register some resources
+        self.quota_api.register_resource('nova.instances',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.cores',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.ram',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.floating_ips',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.fixed_ips',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.metadata_items',
+                                         [],
+                                         [],
+                                         'ABSOLUTE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.injected_files',
+                                         [],
+                                         [],
+                                         'ABSOLUTE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.injected_files_content_bytes',
+                                         [],
+                                         [],
+                                         'ABSOLUTE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.injected_file_path_bytes',
+                                         [],
+                                         [],
+                                         'ABSOLUTE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.security_groups',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.security_groups_rules',
+                                         [],
+                                         [],
+                                         'COUNTABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('nova.key_pairs',
+                                         [],
+                                         [],
+                                         'COUNTABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+
+        self.quota_api.register_resource('cinder.volumes',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('cinder.snapshots',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('cinder.gigabytes',
+                                         [],
+                                         [],
+                                         'RESERVABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+
+        self.quota_api.register_resource('neutron.network',
+                                         [],
+                                         [],
+                                         'COUNTABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('neutron.subnet',
+                                         [],
+                                         [],
+                                         'COUNTABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        self.quota_api.register_resource('neutron.port',
+                                         [],
+                                         [],
+                                         'COUNTABLE',
+                                         86400,
+                                         dict([('user-id', sample_user_id),
+                                               ('role-id', sample_role_id)]))
+        # Create quotas for sample domain and region
+        created_by = dict([("user-id", sample_user_id),
+                           ("role-id", sample_role_id)])
+        self.quota_api.set_domain_quota('nova.instances',
+                                        10,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('nova.cores',
+                                        20,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('nova.ram',
+                                        1024000,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('nova.floating_ips',
+                                        10,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('nova.fixed_ips',
+                                        -1,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('nova.security_groups',
+                                        10,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('cinder.volumes',
+                                        10,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('cinder.snapshots',
+                                        10,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('cinder.gigabytes',
+                                        1000,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('neutron.network',
+                                        10,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('neutron.subnet',
+                                        10,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        self.quota_api.set_domain_quota('neutron.port',
+                                        50,
+                                        sample_domain_id,
+                                        sample_region,
+                                        sample_parent_data,
+                                        created_by)
+        return sample_data
+
+    def test_get_quota_for_non_existing_domain(self):
+        sample_data = self.create_sample_quotas()
+        fake_domain = uuid.uuid4().hex
+        fake_region = "fake_region"
+        service_list = ['nova', 'cinder']
+        with self.assertRaises():
+            self.quota_api.get_domain_quota_by_services(service_list,
+                                                        fake_domain,
+                                                        fake_region)
